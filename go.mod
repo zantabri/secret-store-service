@@ -1,4 +1,4 @@
-module github.com/zantabri/ss-webapp
+module github.com/zantabri/ss-service
 
 go 1.18
 
