@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/zantabri/ss-service/storage"
+	"github.com/zantabri/ss-service/store"
 )
 
 type JsonError struct {
@@ -32,26 +32,12 @@ type GetSecretResponse struct {
 }
 
 type Handler struct {
-	storage *storage.Storage
+	store *store.SecretStore
 }
 
-type SecretsHandler interface {
-	HealthCheck(http.ResponseWriter, *http.Request, httprouter.Params)
+func New(store *store.SecretStore) (handle Handler) {
 
-	GetSecret(http.ResponseWriter, *http.Request, httprouter.Params)
-
-	AddSecret(http.ResponseWriter, *http.Request, httprouter.Params)
-}
-
-func New(storageDirector string) (handle SecretsHandler, err error) {
-
-	storageO, err := storage.New(storageDirector)
-
-	if err != nil {
-		return
-	}
-
-	handle = Handler{storage: &storageO}
+	handle = Handler{store: store}
 	return
 
 }
@@ -75,7 +61,9 @@ func (handler Handler) GetSecret(writer http.ResponseWriter, request *http.Reque
 
 	}
 
-	resp := GetSecretResponse{Secret: handler.storage.RetriveSecret(id)}
+	var store store.SecretStore = *handler.store
+
+	resp := GetSecretResponse{Secret: store.RetriveSecret(id)}
 	raw, err := json.Marshal(resp)
 
 	if err != nil {
@@ -114,7 +102,8 @@ func (handler Handler) AddSecret(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 
-	id := handler.storage.StoreSecret(payload.Secret)
+	var store = *handler.store
+	id := store.StoreSecret(payload.Secret)
 
 	resp, err := json.Marshal(AddSecretResponse{Id: id})
 
@@ -126,7 +115,7 @@ func (handler Handler) AddSecret(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 
-	writer.WriteHeader(200)
+	writer.WriteHeader(201)
 	fmt.Fprintf(writer, "%s", string(resp))
 
 }

@@ -1,4 +1,4 @@
-package storage
+package store
 
 import (
 	"bytes"
@@ -8,24 +8,27 @@ import (
 	"fmt"
 	"io"
 	"os"
+
 )
 
 var SECRETS_DIR string
+
+const DEFAULT_FILE_NAME string = "data.gob"
+
 var cache map[string]string = make(map[string]string)
 
-type Storage struct {
+type fileStore struct {
 	dirPath string
 }
 
-func New(dirPath string) (storage Storage, err error) {
+func NewFileStore(dirPath *string) (store SecretStore, err error) {
 
-	SECRETS_DIR = dirPath
-	
+	SECRETS_DIR = *dirPath
+
 	if len(SECRETS_DIR) == 0 {
 		err = errors.New("invalid directory path")
 		return
 	}
-
 
 	dirInfo, err := os.Stat(SECRETS_DIR)
 
@@ -37,26 +40,24 @@ func New(dirPath string) (storage Storage, err error) {
 			return
 		}
 
-
 	} else if !dirInfo.IsDir() {
 
 		err = errors.New("path is not a directory")
 		return
 
-	} 
+	}
 
-	raw, err2 := os.ReadFile(SECRETS_DIR + "/data.gob")
+	raw, err2 := os.ReadFile(SECRETS_DIR + "/" + DEFAULT_FILE_NAME)
 	err = err2
 
 	if err != nil && err != io.EOF {
-		
+
 		err = createStorageFile()
 
 		if err != nil {
 			return
 		}
-		
-		
+
 	} else {
 
 		buffer := bytes.NewBuffer(raw)
@@ -70,19 +71,23 @@ func New(dirPath string) (storage Storage, err error) {
 
 	}
 
-	storage = Storage{dirPath: SECRETS_DIR}
+	store = &fileStore{dirPath: SECRETS_DIR}
 
 	return
 }
 
-
-func  createStorageDirectory() error {
+func createStorageDirectory() error {
 	fmt.Println("creating directory   ", SECRETS_DIR)
 	return os.Mkdir(SECRETS_DIR, 0755)
 }
 
 func createStorageFile() error {
-	file, err := os.Create(SECRETS_DIR + "/data.gob")
+	file, err := os.Create(SECRETS_DIR + "/" + DEFAULT_FILE_NAME)
+	
+	if err != nil {
+		panic(err.Error())
+	}
+
 	defer file.Close()
 
 	return err
@@ -99,11 +104,11 @@ func writeCacheToDisk() {
 		panic(err.Error())
 	}
 
-	os.WriteFile(SECRETS_DIR+"/data.gob", buffer.Bytes(), os.FileMode(644))
+	os.WriteFile(SECRETS_DIR+"/"+DEFAULT_FILE_NAME, buffer.Bytes(), os.FileMode(644))
 
 }
 
-func (storage *Storage) StoreSecret(key string) string {
+func (store *fileStore) StoreSecret(key string) string {
 
 	id := fmt.Sprintf("%x", md5.Sum([]byte(key)))
 	cache[id] = key
@@ -114,7 +119,7 @@ func (storage *Storage) StoreSecret(key string) string {
 
 }
 
-func (storage *Storage) RetriveSecret(id string) string {
+func (store *fileStore) RetriveSecret(id string) string {
 
 	val := cache[id]
 	delete(cache, id)
