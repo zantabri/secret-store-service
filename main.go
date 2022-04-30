@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"net/http"
+	"os"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/zantabri/ss-service/handlers"
@@ -18,13 +19,26 @@ func main() {
 		panic("sd : secret directory is required")
 	}
 
-	store, err := store.NewFileStore(sd)
+	file_store, err := store.NewFileStore(sd)
 
 	if err != nil {
 		panic(err.Error())
 	}
 
-	handlers := handlers.New(&store)
+	salt := os.Getenv("SS_SALT")
+	password := os.Getenv("SS_PASSWORD")
+
+	if len(salt) == 0 || len(password) == 0 {
+		panic("either salt or password not set")
+	}
+
+	enc_store, err := store.NewEncryptedFileStore(file_store, salt, password)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	handlers := handlers.New(&enc_store)
 	router := httprouter.New()
 
 	if err != nil {
